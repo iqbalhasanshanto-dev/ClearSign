@@ -1,4 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import { SendIcon, SpeakerIcon, PauseIcon } from '../icons'
 import { Waveform } from '../components/shared'
 import type { Message } from '../data'
@@ -145,7 +147,9 @@ export default function AIAssistantScreen({
               }`}
               style={msg.role === 'ai' ? { backgroundColor: 'rgba(91,111,214,0.10)' } : {}}
             >
-              {msg.text}
+              <ReactMarkdown className="chat-markdown" remarkPlugins={[remarkGfm]}>
+                {msg.text}
+              </ReactMarkdown>
             </div>
           </div>
         ))}

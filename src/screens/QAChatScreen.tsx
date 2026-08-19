@@ -1,4 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import { BackButton, MockDocument } from '../components/shared'
 import { SendIcon } from '../icons'
 import type { Report, Message } from '../data'
@@ -118,7 +120,9 @@ export default function QAChatScreen({
               }`}
               style={msg.role === 'ai' ? { backgroundColor: 'rgba(91,111,214,0.10)' } : {}}
             >
-              {msg.text}
+              <ReactMarkdown className="chat-markdown" remarkPlugins={[remarkGfm]}>
+                {msg.text}
+              </ReactMarkdown>
             </div>
           </div>
         ))}
