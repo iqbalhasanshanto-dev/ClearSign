@@ -1,47 +1,76 @@
 import { useState, useRef } from 'react'
-import { BackButton, Divider, DocumentPlaceholder } from '../components/shared'
+import { BackButton, Divider } from '../components/shared'
 import { CameraIcon, UploadIcon, RobotIcon } from '../icons'
+import { analyzeReportImage } from '../services/gemini'
+
 export interface UploadedFile {
   name: string
   previewUrl: string
   type: string
+  base64Data: string
 }
 
 interface TakeUploadScreenProps {
   onBack: () => void
   uploadedFile: UploadedFile | null
   onSetFile: (file: UploadedFile | null) => void
-  isAnalyzing: boolean
-  onAnalyze: () => void
+  onAnalyze: (analysis: string, error?: string) => void
   uploadMode: 'report' | 'profile'
+}
+
+function readFileAsBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onerror = () => reject(new Error('Unable to read the selected image.'))
+    reader.onload = () => {
+      const result = reader.result
+      if (typeof result !== 'string') {
+        reject(new Error('Unable to read the selected image.'))
+        return
+      }
+      resolve(result.split(',')[1] ?? '')
+    }
+    reader.readAsDataURL(file)
+  })
 }
 
 export default function TakeUploadScreen({
   onBack,
   uploadedFile,
   onSetFile,
-  isAnalyzing,
   onAnalyze,
   uploadMode,
 }: TakeUploadScreenProps) {
   const [isDragging, setIsDragging] = useState(false)
+  const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [fileError, setFileError] = useState('')
   const cameraInputRef = useRef<HTMLInputElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  function handleFileSelect(file: File) {
-    const isSupported = file.type.startsWith('image/') || file.type === 'application/pdf'
+  async function handleFileSelect(file: File) {
+    const isSupported = file.type === 'image/jpeg' || file.type === 'image/png'
     if (!isSupported) {
-      setFileError('Choose a JPEG, PNG, or PDF file.')
+      setFileError('Choose a JPEG or PNG image.')
       return
     }
     if (file.size > 20 * 1024 * 1024) {
       setFileError('Choose a file smaller than 20MB.')
       return
     }
-    setFileError('')
-    if (uploadedFile) URL.revokeObjectURL(uploadedFile.previewUrl)
-    onSetFile({ name: file.name, previewUrl: URL.createObjectURL(file), type: file.type })
+    try {
+      const base64Data = await readFileAsBase64(file)
+      if (!base64Data) throw new Error('Unable to read the selected image.')
+      setFileError('')
+      if (uploadedFile) URL.revokeObjectURL(uploadedFile.previewUrl)
+      onSetFile({
+        name: file.name,
+        previewUrl: URL.createObjectURL(file),
+        type: file.type,
+        base64Data,
+      })
+    } catch (error) {
+      setFileError(error instanceof Error ? error.message : 'Unable to read the selected image.')
+    }
   }
 
   function handleDrop(e: React.DragEvent) {
@@ -52,14 +81,27 @@ export default function TakeUploadScreen({
   }
 
   const hasFile = !!uploadedFile
-  const isPdf = uploadedFile?.type === 'application/pdf'
-
   function clearSelection() {
     if (uploadedFile) URL.revokeObjectURL(uploadedFile.previewUrl)
     onSetFile(null)
     setFileError('')
     if (cameraInputRef.current) cameraInputRef.current.value = ''
     if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  async function handleAnalyze() {
+    if (!uploadedFile || isAnalyzing) return
+
+    setIsAnalyzing(true)
+    setFileError('')
+    try {
+      const analysis = await analyzeReportImage(uploadedFile.base64Data, uploadedFile.type)
+      onAnalyze(analysis)
+    } catch (error) {
+      onAnalyze('', error instanceof Error ? error.message : 'Unable to analyze this report. Please try again.')
+    } finally {
+      setIsAnalyzing(false)
+    }
   }
 
   return (
@@ -108,7 +150,7 @@ export default function TakeUploadScreen({
         <input
           ref={cameraInputRef}
           type="file"
-          accept="image/*"
+          accept="image/png,image/jpeg"
           capture="environment"
           className="hidden"
           onChange={e => { if (e.target.files?.[0]) handleFileSelect(e.target.files[0]) }}
@@ -116,7 +158,7 @@ export default function TakeUploadScreen({
         <input
           ref={fileInputRef}
           type="file"
-          accept="image/*,application/pdf"
+          accept="image/png,image/jpeg"
           className="hidden"
           onChange={e => { if (e.target.files?.[0]) handleFileSelect(e.target.files[0]) }}
         />
@@ -131,14 +173,7 @@ export default function TakeUploadScreen({
           {hasFile ? (
             <div className="relative">
               <div className="p-4">
-                {isPdf ? (
-                  <div className="rounded-[8px] border border-[var(--ink-a10)] bg-paper p-6">
-                    <DocumentPlaceholder />
-                    <p className="mt-3 text-center text-sm font-medium text-ink break-words">{uploadedFile.name}</p>
-                  </div>
-                ) : (
-                  <img src={uploadedFile.previewUrl} alt={uploadedFile.name} className="w-full rounded-[8px] object-contain max-h-96" />
-                )}
+                <img src={uploadedFile.previewUrl} alt={uploadedFile.name} className="w-full rounded-[8px] object-contain max-h-96" />
               </div>
               {/* Retake button */}
               <button
@@ -155,7 +190,7 @@ export default function TakeUploadScreen({
                 {isDragging ? 'Drop your document here' : 'Preview will appear here'}
               </p>
               <p className="text-sm" style={{ color: 'var(--ink-a50)' }}>
-                JPEG, PNG, PDF — up to 20MB
+                JPEG or PNG — up to 20MB
               </p>
             </div>
           )}
@@ -164,7 +199,7 @@ export default function TakeUploadScreen({
           {hasFile && !isAnalyzing && (
             <div className="px-4 pb-4">
               <button
-                onClick={onAnalyze}
+                onClick={handleAnalyze}
                 className="w-full bg-periwinkle text-white py-3.5 rounded-full font-medium flex items-center justify-center gap-2.5 hover:opacity-90 transition-opacity active:scale-[0.98] shadow-[0_4px_16px_rgba(91,111,214,0.3)]"
               >
                 <RobotIcon size={20} />
@@ -178,8 +213,8 @@ export default function TakeUploadScreen({
             <div className="absolute inset-0 bg-paper/90 backdrop-blur-sm flex flex-col items-center justify-center gap-4">
               <div className="w-12 h-12 rounded-full border-4 border-clinical-blue border-t-transparent animate-spin" />
               <div className="text-center">
-                <p className="text-base font-semibold text-ink">Reading your document…</p>
-                <p className="text-sm mt-1" style={{ color: 'var(--ink-a50)' }}>This takes about 10 seconds</p>
+                <p className="text-base font-semibold text-ink">ClearSign AI is analyzing your report...</p>
+                <p className="text-sm mt-1" style={{ color: 'var(--ink-a50)' }}>This can take a few seconds</p>
               </div>
             </div>
           )}

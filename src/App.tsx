@@ -38,7 +38,8 @@ export default function App() {
 
   // Upload
   const [uploadedFile, setUploadedFile] = useState<UploadedFile | null>(null)
-  const [isAnalyzing, setIsAnalyzing] = useState(false)
+  const [uploadedAnalysis, setUploadedAnalysis] = useState<string | null>(null)
+  const [analysisError, setAnalysisError] = useState<string | null>(null)
   const [uploadMode, setUploadMode] = useState<UploadMode>('report')
 
   // Read aloud
@@ -72,6 +73,8 @@ export default function App() {
 
   function handleSelectReport(id: string) {
     setSelectedReportId(id)
+    setUploadedAnalysis(null)
+    setAnalysisError(null)
     navigate('results')
   }
 
@@ -82,25 +85,27 @@ export default function App() {
   function handleUploadNavigate() {
     setUploadMode('report')
     setUploadedFile(null)
+    setUploadedAnalysis(null)
+    setAnalysisError(null)
     navigate('upload')
   }
 
-  function handleAnalyze() {
-    setIsAnalyzing(true)
-    setTimeout(() => {
-      setIsAnalyzing(false)
-      // Use mock report content to simulate an analysis result, including when
-      // the user has deleted their full history.
-      const template = mockReports[Math.floor(Math.random() * mockReports.length)]
-      const analyzedReport: Report = {
-        ...template,
-        id: `upload-${Date.now()}`,
-        title: `Uploaded ${template.title}`,
-      }
-      setReports(prev => [analyzedReport, ...prev])
-      setSelectedReportId(analyzedReport.id)
-      navigate('results')
-    }, 2200)
+  function handleAnalyze(analysis: string, error?: string) {
+    const analyzedReport: Report = {
+      id: `upload-${Date.now()}`,
+      title: uploadedFile ? `Uploaded ${uploadedFile.name}` : 'Uploaded report',
+      date: new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }),
+      preview: error ? 'Analysis could not be completed.' : 'AI analysis generated from your uploaded report.',
+      severity: 'normal',
+      docType: 'blood',
+      overview: analysis || 'Analysis could not be completed.',
+      criticalHits: [],
+    }
+    setUploadedAnalysis(analysis || null)
+    setAnalysisError(error ?? null)
+    setReports(prev => [analyzedReport, ...prev])
+    setSelectedReportId(analyzedReport.id)
+    navigate('results')
   }
 
   function handleLogout() {
@@ -155,7 +160,6 @@ export default function App() {
                 onBack={() => navigate('home')}
                 uploadedFile={uploadedFile}
                 onSetFile={setUploadedFile}
-                isAnalyzing={isAnalyzing}
                 onAnalyze={handleAnalyze}
                 uploadMode={uploadMode}
               />
@@ -168,6 +172,9 @@ export default function App() {
                 onBack={() => navigate('home')}
                 isReadingAloud={isReadingAloud}
                 onToggleReadAloud={() => setIsReadingAloud(v => !v)}
+                uploadedFile={uploadedFile}
+                analysis={uploadedAnalysis}
+                analysisError={analysisError}
               />
             )}
 

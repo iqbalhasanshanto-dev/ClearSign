@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { BackButton, HighlightTitle, Card, Waveform, MockDocument } from '../components/shared'
 import { SpeakerIcon, PauseIcon, RobotIcon, AlertIcon, CheckIcon } from '../icons'
 import type { Report, Screen } from '../data'
+import type { UploadedFile } from './TakeUploadScreen'
 
 interface ReportResultsScreenProps {
   report: Report
@@ -9,6 +10,9 @@ interface ReportResultsScreenProps {
   onBack: () => void
   isReadingAloud: boolean
   onToggleReadAloud: () => void
+  uploadedFile: UploadedFile | null
+  analysis: string | null
+  analysisError: string | null
 }
 
 export default function ReportResultsScreen({
@@ -17,9 +21,13 @@ export default function ReportResultsScreen({
   onBack,
   isReadingAloud,
   onToggleReadAloud,
+  uploadedFile,
+  analysis,
+  analysisError,
 }: ReportResultsScreenProps) {
   const [imageExpanded, setImageExpanded] = useState(false)
   const hasNoCritical = report.criticalHits.length === 0
+  const isUploadedAnalysis = analysis !== null || analysisError !== null
 
   return (
     <div className="flex flex-col min-h-screen bg-paper">
@@ -42,7 +50,11 @@ export default function ReportResultsScreen({
               aria-label="Expand document view"
             >
               <div className="rounded-[12px] overflow-hidden border border-[var(--ink-a10)]">
-                <MockDocument docType={report.docType} />
+                {uploadedFile ? (
+                  <img src={uploadedFile.previewUrl} alt={uploadedFile.name} className="w-full max-h-[560px] object-contain bg-white" />
+                ) : (
+                  <MockDocument docType={report.docType} />
+                )}
               </div>
               <div className="absolute bottom-3 right-3 bg-ink/60 backdrop-blur-sm text-white text-xs px-2.5 py-1 rounded-full">
                 Tap to expand
@@ -57,7 +69,7 @@ export default function ReportResultsScreen({
             <Card className="p-5">
               <div className="flex items-start justify-between gap-3 mb-3">
                 <h2 className="text-xl font-bold text-ink font-heading">
-                  <HighlightTitle>Overview</HighlightTitle>
+                  <HighlightTitle>{isUploadedAnalysis ? 'ClearSign AI breakdown' : 'Overview'}</HighlightTitle>
                 </h2>
                 <button
                   onClick={onToggleReadAloud}
@@ -77,11 +89,18 @@ export default function ReportResultsScreen({
                   )}
                 </button>
               </div>
-              <p className="text-base leading-relaxed text-ink">{report.overview}</p>
+              {analysisError ? (
+                <div className="rounded-[10px] border border-clarity-amber/30 bg-clarity-amber/10 p-4 text-sm text-clarity-amber" role="alert">
+                  <p className="font-semibold">We couldn’t analyze this report.</p>
+                  <p className="mt-1">{analysisError}</p>
+                </div>
+              ) : (
+                <div className="whitespace-pre-wrap leading-relaxed text-gray-800">{analysis ?? report.overview}</div>
+              )}
             </Card>
 
             {/* Critical Hits card */}
-            <Card className="p-5">
+            {!isUploadedAnalysis && <Card className="p-5">
               <div className="flex items-center gap-2 mb-4">
                 {hasNoCritical ? (
                   <CheckIcon size={20} className="text-steady-green flex-shrink-0" />
@@ -129,7 +148,7 @@ export default function ReportResultsScreen({
                   ))}
                 </div>
               )}
-            </Card>
+            </Card>}
 
           </div>
         </div>
@@ -159,7 +178,11 @@ export default function ReportResultsScreen({
             </svg>
           </button>
           <div className="w-full max-w-lg bg-white rounded-[16px] overflow-hidden">
-            <MockDocument docType={report.docType} />
+            {uploadedFile ? (
+              <img src={uploadedFile.previewUrl} alt={uploadedFile.name} className="w-full max-h-[85vh] object-contain" />
+            ) : (
+              <MockDocument docType={report.docType} />
+            )}
           </div>
         </div>
       )}
