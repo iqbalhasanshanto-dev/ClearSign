@@ -1,32 +1,27 @@
-import { GoogleGenAI } from '@google/genai'
+import { GoogleGenAI } from '@google/genai';
 
-const apiKey = import.meta.env.VITE_GEMINI_API_KEY
+const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+const ai = new GoogleGenAI({ apiKey: apiKey || '' });
 
-const ai = apiKey ? new GoogleGenAI({ apiKey }) : null
-
-const systemInstruction = `You are ClearSign AI, a helpful medical assistant.
-- Automatically detect the user's language.
-- If the user writes in Bangla (বাংলা) or requests information in Bangla, respond in fluent, easy-to-understand Bangla.
-- Always structure your responses cleanly with Markdown headers, bullet points, and proper line breaks.`
-
-/** Sends a prompt to Gemini and returns its generated text. */
 export async function askGemini(prompt: string): Promise<string> {
-  if (!ai) {
-    throw new Error('Gemini is not configured. Add VITE_GEMINI_API_KEY to your environment and restart the app.')
+  try {
+    if (!apiKey) {
+      return "⚠️ API Key missing! Please check VITE_GEMINI_API_KEY in .env.local";
+    }
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: prompt,
+      config: {
+        systemInstruction: 
+          "You are ClearSign AI, a medical assistant.\n" +
+          "1. Respond clearly with bullet points and line breaks.\n" +
+          "2. If requested or asked in Bangla (বাংলা), respond in fluent Bangla.\n" +
+          "3. Keep formatting clean and easy to read."
+      }
+    });
+    return response.text || "No response received from Gemini.";
+  } catch (error: any) {
+    console.error("Gemini API Error:", error);
+    return `⚠️ Error: ${error?.message || "Failed to connect to Gemini API."}`;
   }
-
-  const response = await ai.models.generateContent({
-    model: 'gemini-3.6-flash',
-    contents: prompt,
-    config: {
-      systemInstruction,
-    },
-  })
-
-  const text = response.text?.trim()
-  if (!text) {
-    throw new Error('Gemini returned an empty response. Please try again.')
-  }
-
-  return text
 }

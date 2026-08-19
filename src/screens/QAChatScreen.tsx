@@ -1,11 +1,9 @@
 import { useState, useRef, useEffect } from 'react'
-import ReactMarkdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
 import { BackButton, MockDocument } from '../components/shared'
 import { SendIcon } from '../icons'
 import type { Report, Message } from '../data'
 import { suggestedQuestions } from '../data'
-import { askGemini } from '../services/gemini'
+import { askGemini } from '../services/gemini';
 
 interface QAChatScreenProps {
   report: Report
@@ -120,9 +118,7 @@ export default function QAChatScreen({
               }`}
               style={msg.role === 'ai' ? { backgroundColor: 'rgba(91,111,214,0.10)' } : {}}
             >
-              <ReactMarkdown className="chat-markdown" remarkPlugins={[remarkGfm]}>
-                {msg.text}
-              </ReactMarkdown>
+              <div className="whitespace-pre-wrap leading-relaxed">{msg.text}</div>
             </div>
           </div>
         ))}
