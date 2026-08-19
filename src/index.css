@@ -1,0 +1,137 @@
+@import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
+@import 'tailwindcss';
+
+/* Raw CSS custom properties — .dark overrides propagate automatically into all utilities */
+:root {
+  --ink: #0E1B2B;
+  --paper: #F3F6FC;
+  --surface: #FFFFFF;
+  --sky-tint: #E7EFFC;
+  --clinical-blue: #1958C1;
+  --clarity-amber: #E2574C;
+  --steady-green: #2E9A5E;
+  --periwinkle: #4C63D2;
+  --ink-a10: rgba(14, 27, 43, 0.10);
+  --ink-a20: rgba(14, 27, 43, 0.20);
+  --ink-a50: rgba(14, 27, 43, 0.50);
+}
+
+.dark {
+  --ink: #EAF1FB;
+  --paper: #0B141F;
+  --surface: #12202F;
+  --sky-tint: #162848;
+  --clinical-blue: #3D74D8;
+  --clarity-amber: #E96459;
+  --steady-green: #3BAD6E;
+  --periwinkle: #6879DE;
+  --ink-a10: rgba(234, 241, 251, 0.10);
+  --ink-a20: rgba(234, 241, 251, 0.20);
+  --ink-a50: rgba(234, 241, 251, 0.50);
+}
+
+/* @theme inline — Tailwind utilities reference CSS variables so dark mode works without dark: prefixes */
+@theme inline {
+  --color-ink: var(--ink);
+  --color-paper: var(--paper);
+  --color-surface: var(--surface);
+  --color-sky-tint: var(--sky-tint);
+  --color-clinical-blue: var(--clinical-blue);
+  --color-clarity-amber: var(--clarity-amber);
+  --color-steady-green: var(--steady-green);
+  --color-periwinkle: var(--periwinkle);
+}
+
+@theme {
+  --font-heading: 'Sora', sans-serif;
+  --font-body: 'IBM Plex Sans', sans-serif;
+  --font-data: 'IBM Plex Mono', monospace;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  font-family: 'IBM Plex Sans', sans-serif;
+}
+
+body {
+  background-color: var(--paper);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+html[data-scale="125"] body { font-size: 18px; }
+html[data-scale="150"] body { font-size: 20px; }
+
+/* Hide scrollbars globally */
+* { scrollbar-width: none; }
+*::-webkit-scrollbar { display: none; }
+
+/* Card shadow */
+.card-shadow {
+  box-shadow: 0px 4px 16px rgba(14, 27, 43, 0.08);
+}
+
+/* Highlighter-swipe — clinical-blue at 25% opacity */
+.highlight-title {
+  position: relative;
+  display: inline-block;
+}
+.highlight-title::before {
+  content: '';
+  position: absolute;
+  bottom: -3px;
+  left: -2px;
+  right: -2px;
+  height: 10px;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 10' preserveAspectRatio='none'%3E%3Cpath d='M2,7 Q20,3 40,5.5 Q60,8 80,4.5 Q100,1.5 118,6' stroke='rgba(25,88,193,0.25)' stroke-width='8' fill='none' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat center bottom;
+  background-size: 100% 100%;
+  pointer-events: none;
+}
+
+/* Waveform animation */
+@keyframes waveBar {
+  0%, 100% { transform: scaleY(0.4); }
+  50% { transform: scaleY(1); }
+}
+.wave-bar {
+  animation: waveBar 0.9s ease-in-out infinite;
+}
+.wave-bar:nth-child(2) { animation-delay: 0.15s; }
+.wave-bar:nth-child(3) { animation-delay: 0.3s; }
+.wave-bar:nth-child(4) { animation-delay: 0.15s; }
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+.animate-spin {
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.fade-in {
+  animation: fadeIn 0.2s ease-out forwards;
+}
+
+@keyframes slideUp {
+  from { transform: translateY(100%); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+.slide-up {
+  animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes dotBlink {
+  0%, 80%, 100% { opacity: 0.2; }
+  40% { opacity: 1; }
+}
+.typing-dot {
+  animation: dotBlink 1.2s ease-in-out infinite;
+}
+.typing-dot:nth-child(2) { animation-delay: 0.2s; }
+.typing-dot:nth-child(3) { animation-delay: 0.4s; }

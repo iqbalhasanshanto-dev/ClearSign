@@ -1,0 +1,10 @@
+{
+  "description": "Transform medical documents into clear, plain-language summaries for patients and caregivers, enhancing understanding and accessibility.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}
