@@ -19,5 +19,6 @@ logs/
 /.plugins/
 /.opencode-skills/
 
+*.local
 .env
 .env.local

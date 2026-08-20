@@ -31,18 +31,16 @@ function ReportCard({
   onSelect: () => void
   onDeleteRequest: () => void
 }) {
-  const [showDelete, setShowDelete] = useState(false)
-
   return (
     <div
       className="bg-surface rounded-[12px] card-shadow overflow-hidden group cursor-pointer active:scale-[0.99] transition-transform duration-100"
       onClick={onSelect}
     >
-      {/* Status stripe — 3px left edge gives scannable color at a glance */}
+      {/* Status stripe */}
       <div className="flex">
         <div className={`w-[3px] flex-shrink-0 ${SEVERITY_STRIPE[report.severity]}`} />
         <div className="flex-1 p-4 flex items-start gap-3">
-          {/* Doc type icon in sky-tint circle */}
+          {/* Doc type icon */}
           <div className="w-10 h-10 rounded-[10px] bg-sky-tint flex items-center justify-center flex-shrink-0">
             <span className="text-xl" role="img" aria-hidden="true">
               {DOC_ICONS[report.docType] ?? '📄'}
@@ -57,9 +55,13 @@ function ReportCard({
                   {report.preview}
                 </p>
               </div>
-              {/* Trash — visible on hover/focus */}
+              {/* Trash icon button */}
               <button
-                onClick={e => { e.stopPropagation(); setShowDelete(true) }}
+                type="button"
+                onClick={e => {
+                  e.stopPropagation()
+                  onDeleteRequest()
+                }}
                 className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity text-ink/30 hover:text-clarity-amber hover:bg-clarity-amber/10 -mr-1 -mt-1"
                 aria-label="Delete report"
               >
@@ -72,22 +74,10 @@ function ReportCard({
           </div>
         </div>
       </div>
-
-      {showDelete && (
-        <ConfirmDialog
-          title="Delete this report?"
-          message="This report and its chat history will be permanently removed. This can't be undone."
-          confirmLabel="Delete"
-          onConfirm={() => { setShowDelete(false); onDeleteRequest() }}
-          onCancel={() => setShowDelete(false)}
-          dangerous
-        />
-      )}
     </div>
   )
 }
 
-/* ClearSign icon mark — clipboard with checkmark in clinical-blue */
 function BrandMark() {
   return (
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" className="flex-shrink-0">
@@ -106,11 +96,12 @@ export default function HomeScreen({
   onDeleteReport,
   onShowProfile,
 }: HomeScreenProps) {
+  const [deletingReportId, setDeletingReportId] = useState<string | null>(null)
+
   return (
     <div className="flex flex-col h-full">
       {/* Top bar */}
       <header className="flex items-center justify-between px-5 pt-5 pb-3 bg-paper sticky top-0 z-10">
-        {/* Wordmark with icon mark */}
         <div className="flex items-center gap-2">
           <BrandMark />
           <span className="text-xl font-bold text-ink font-heading">
@@ -118,7 +109,6 @@ export default function HomeScreen({
           </span>
         </div>
 
-        {/* Profile avatar with clinical-blue ring */}
         <button
           onClick={onShowProfile}
           className="w-10 h-10 rounded-full bg-gradient-to-br from-clinical-blue to-periwinkle flex items-center justify-center ring-2 ring-clinical-blue ring-offset-2 ring-offset-paper hover:opacity-90 transition-opacity focus:outline-none focus-visible:ring-2 focus-visible:ring-clinical-blue"
@@ -130,9 +120,8 @@ export default function HomeScreen({
         </button>
       </header>
 
-      {/* Content */}
+      {/* Main Content */}
       <main className="flex-1 overflow-y-auto px-5 pb-[100px]">
-        {/* Section header with report count */}
         <div className="flex items-baseline gap-3 mt-2 mb-5">
           <h2 className="text-2xl font-bold text-ink font-heading">
             <HighlightTitle>History</HighlightTitle>
@@ -145,7 +134,6 @@ export default function HomeScreen({
         </div>
 
         {reports.length === 0 ? (
-          /* Empty state */
           <div className="flex flex-col items-center justify-center py-20 text-center">
             <div className="w-20 h-20 rounded-full bg-clinical-blue/10 flex items-center justify-center mb-5">
               <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#1958C1" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round">
@@ -167,21 +155,35 @@ export default function HomeScreen({
             </button>
           </div>
         ) : (
-          /* Report list — white cards on blue-tinted paper for depth */
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-1 gap-3">
             {reports.map(report => (
               <ReportCard
                 key={report.id}
                 report={report}
                 onSelect={() => onSelectReport(report.id)}
-                onDeleteRequest={() => onDeleteReport(report.id)}
+                onDeleteRequest={() => setDeletingReportId(report.id)}
               />
             ))}
           </div>
         )}
       </main>
 
-      {/* Floating camera FAB — clinical-blue */}
+      {/* Delete Confirmation Modal rendered safely at root level */}
+      {deletingReportId && (
+        <ConfirmDialog
+          title="Delete this report?"
+          message="This report and its chat history will be permanently removed. This can't be undone."
+          confirmLabel="Delete"
+          onConfirm={() => {
+            onDeleteReport(deletingReportId)
+            setDeletingReportId(null)
+          }}
+          onCancel={() => setDeletingReportId(null)}
+          dangerous
+        />
+      )}
+
+      {/* Floating camera FAB */}
       <button
         onClick={() => onNavigate('upload')}
         className="fixed bottom-[84px] right-5 w-14 h-14 rounded-full bg-clinical-blue text-white shadow-[0_6px_24px_rgba(25,88,193,0.40)] flex items-center justify-center hover:opacity-90 transition-all active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-clinical-blue z-30"

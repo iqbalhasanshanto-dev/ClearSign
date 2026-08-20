@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import type { Screen, Report, Profile, UploadMode } from './data'
 import { mockReports } from './data'
+import { supabase, fetchReportsFromSupabase } from './services/supabase'
 
 import BottomNav from './components/BottomNav'
 import Sidebar from './components/Sidebar'
@@ -51,6 +52,39 @@ export default function App() {
   const [textScale, setTextScale] = useState<100 | 125 | 150>(100)
   const [notificationsEnabled, setNotificationsEnabled] = useState(true)
 
+  // Fetch Supabase reports on load
+  useEffect(() => {
+    async function loadDbReports() {
+      try {
+        const dbReports = await fetchReportsFromSupabase()
+        if (dbReports && dbReports.length > 0) {
+          const formatted: Report[] = dbReports.map((r: any) => ({
+            id: String(r.id),
+            title: r.title || 'Uploaded Report',
+            date: r.created_at
+              ? new Date(r.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+              : new Date().toLocaleDateString(),
+            preview: r.analysis ? r.analysis.slice(0, 100) + '...' : 'AI analysis generated from report.',
+            severity: 'normal',
+            docType: 'blood',
+            overview: r.analysis || '',
+            criticalHits: r.critical_hits ? [r.critical_hits] : [],
+          }))
+
+          setReports(prev => {
+            const existingIds = new Set(prev.map(p => p.id))
+            const newItems = formatted.filter(item => !existingIds.has(item.id))
+            return [...newItems, ...prev]
+          })
+        }
+      } catch (err) {
+        console.error('Error fetching reports from Supabase:', err)
+      }
+    }
+
+    loadDbReports()
+  }, [])
+
   // Apply dark mode to <html>
   useEffect(() => {
     document.documentElement.classList.toggle('dark', darkMode)
@@ -68,7 +102,6 @@ export default function App() {
       setProfileReturnScreen(screen)
     }
     setScreen(next)
-    // Reset read-aloud when leaving results
     if (screen === 'results' || screen === 'ai') setIsReadingAloud(false)
   }
 
@@ -80,8 +113,15 @@ export default function App() {
     navigate('results')
   }
 
-  function handleDeleteReport(id: string) {
+  // Deletes report immediately from UI state and syncs with Supabase
+  async function handleDeleteReport(id: string) {
     setReports(prev => prev.filter(r => r.id !== id))
+
+    try {
+      await supabase.from('reports').delete().eq('id', id)
+    } catch (err) {
+      console.error('Error deleting report from Supabase:', err)
+    }
   }
 
   function handleUploadNavigate() {
@@ -93,17 +133,42 @@ export default function App() {
     navigate('upload')
   }
 
-  function handleAnalyze(analysis: string, error?: string) {
+  // Saves newly analyzed report directly into Supabase
+  async function handleAnalyze(analysis: string, error?: string) {
+    const reportTitle = uploadedFile ? `Uploaded ${uploadedFile.name}` : 'Uploaded report'
+    const overviewText = analysis || 'Analysis could not be completed.'
+    let reportId = `upload-${Date.now()}`
+
+    try {
+      const { data, error: dbErr } = await supabase
+        .from('reports')
+        .insert([
+          {
+            title: reportTitle,
+            analysis: overviewText,
+            critical_hits: '',
+          },
+        ])
+        .select()
+
+      if (!dbErr && data && data[0]) {
+        reportId = String(data[0].id)
+      }
+    } catch (err) {
+      console.error('Error saving report to Supabase:', err)
+    }
+
     const analyzedReport: Report = {
-      id: `upload-${Date.now()}`,
-      title: uploadedFile ? `Uploaded ${uploadedFile.name}` : 'Uploaded report',
+      id: reportId,
+      title: reportTitle,
       date: new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }),
       preview: error ? 'Analysis could not be completed.' : 'AI analysis generated from your uploaded report.',
       severity: 'normal',
       docType: 'blood',
-      overview: analysis || 'Analysis could not be completed.',
+      overview: overviewText,
       criticalHits: [],
     }
+
     setUploadedAnalysis(analysis || null)
     setAnalysisError(error ?? null)
     setReports(prev => [analyzedReport, ...prev])
@@ -125,11 +190,9 @@ export default function App() {
     setScreen(profileReturnScreen)
   }
 
-  // Determine layout variant
   const showNav = NAV_SCREENS.includes(screen) && isLoggedIn
   return (
     <div className="min-h-screen bg-paper text-ink">
-      {/* Auth screens — full-bleed, no nav */}
       {(screen === 'login') && (
         <LoginScreen
           onNavigate={s => { setIsLoggedIn(true); navigate(s) }}
@@ -144,10 +207,8 @@ export default function App() {
         />
       )}
 
-      {/* App screens — with nav shell */}
       {isLoggedIn && screen !== 'login' && screen !== 'signup' && (
         <div className="flex min-h-screen">
-          {/* Sidebar — desktop (xl+) */}
           {showNav && (
             <div className="hidden xl:block flex-shrink-0" style={{ width: '260px' }}>
               <Sidebar
@@ -159,10 +220,7 @@ export default function App() {
             </div>
           )}
 
-          {/* Main content area */}
           <div className={`flex-1 flex flex-col min-h-screen ${showNav ? 'xl:ml-0' : ''}`}>
-
-            {/* Sub-flow screens (no nav) */}
             {screen === 'upload' && (
               <TakeUploadScreen
                 onBack={() => navigate('home')}
@@ -194,7 +252,6 @@ export default function App() {
               />
             )}
 
-            {/* Primary nav screens */}
             {screen === 'home' && (
               <div className="flex-1 flex flex-col overflow-hidden">
                 <HomeScreen
@@ -233,14 +290,12 @@ export default function App() {
               </div>
             )}
 
-            {/* Bottom tab bar — mobile & tablet (non-desktop) */}
             {showNav && (
               <div className="xl:hidden">
                 <BottomNav
                   active={screen}
                   onNavigate={navigate}
                 />
-                {/* Spacer for bottom nav height */}
                 <div className="h-[72px]" />
               </div>
             )}
@@ -248,7 +303,6 @@ export default function App() {
         </div>
       )}
 
-      {/* Profile modal — rendered above everything when open */}
       {screen === 'profile' && isLoggedIn && (
         <ProfileModal
           profile={profile}
