@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Logo, PrimaryButton, SecondaryButton, TextInput, PasswordInput, Divider } from '../components/shared'
 import { GoogleIcon } from '../icons'
 import type { Screen } from '../data'
+import { supabase } from '../services/supabase'
 
 interface SignUpScreenProps {
   onNavigate: (s: Screen) => void
@@ -16,9 +17,10 @@ export default function SignUpScreen({ onNavigate }: SignUpScreenProps) {
   const [confirmError, setConfirmError] = useState('')
   const [loading, setLoading] = useState(false)
 
-  function handleSignUp() {
+  async function handleSignUp() {
     setEmailError('')
     setConfirmError('')
+
     let valid = true
     if (!email.includes('@')) {
       setEmailError('Enter a valid email address')
@@ -28,12 +30,60 @@ export default function SignUpScreen({ onNavigate }: SignUpScreenProps) {
       setConfirmError('Passwords do not match')
       valid = false
     }
+    if (password.length < 6) {
+      setConfirmError('Password must be at least 6 characters')
+      valid = false
+    }
     if (!valid) return
+
     setLoading(true)
-    setTimeout(() => {
+
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            full_name: name,
+          },
+        },
+      })
+
+      if (error) {
+        setEmailError(error.message)
+        setLoading(false)
+        return
+      }
+
+      if (data.session) {
+        onNavigate('home')
+      } else {
+        alert('Account created! Please check your email for a confirmation link.')
+        onNavigate('login')
+      }
+    } catch (err: any) {
+      setEmailError(err.message || 'An error occurred during sign up.')
+    } finally {
       setLoading(false)
-      onNavigate('home')
-    }, 900)
+    }
+  }
+
+  async function handleGoogleSignUp() {
+    setEmailError('')
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: window.location.origin,
+        },
+      })
+
+      if (error) {
+        setEmailError(error.message)
+      }
+    } catch (err: any) {
+      setEmailError(err.message || 'Failed to initialize Google authentication.')
+    }
   }
 
   const canSubmit = name && email && password && confirm
@@ -88,7 +138,7 @@ export default function SignUpScreen({ onNavigate }: SignUpScreenProps) {
               Sign up
             </PrimaryButton>
             <Divider label="or" />
-            <SecondaryButton onClick={() => onNavigate('home')}>
+            <SecondaryButton onClick={handleGoogleSignUp}>
               <GoogleIcon size={20} />
               Continue with Google
             </SecondaryButton>
