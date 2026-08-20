@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { BackButton, HighlightTitle, Card, Waveform, MockDocument } from '../components/shared'
 import { SpeakerIcon, PauseIcon, RobotIcon, AlertIcon } from '../icons'
+import { saveReportToSupabase } from '../services/supabase'
 import type { Report } from '../data'
 import type { UploadedFile } from './TakeUploadScreen'
 
@@ -47,12 +48,29 @@ export default function ReportResultsScreen({
   analysisError,
 }: ReportResultsScreenProps) {
   const [imageExpanded, setImageExpanded] = useState(false)
+  const hasSavedToDb = useRef(false)
+
   const isUploadedAnalysis = analysis !== null || analysisError !== null
   const parsedAnalysis = analysis ? splitAnalysisSections(analysis) : null
+
   const criticalAlerts = isUploadedAnalysis
     ? parsedAnalysis?.alerts ?? []
-    : report.criticalHits.map(hit => `${hit.value} ${hit.unit} — ${hit.meaning}`)
+    : report.criticalHits?.map(hit => `${hit.value} ${hit.unit} — ${hit.meaning}`) ?? []
+
   const reportBreakdown = parsedAnalysis?.breakdown ?? report.overview
+
+  // Automatically save to Supabase once the analysis is ready
+  useEffect(() => {
+    if (isUploadedAnalysis && analysis && !hasSavedToDb.current) {
+      hasSavedToDb.current = true;
+      saveReportToSupabase({
+        title: report.title || 'New Analysis',
+        analysis: reportBreakdown,
+        criticalHits: criticalAlerts.join(' | '), // Storing as a string
+        imageBase64: uploadedFile?.previewUrl || '',
+      }).catch(err => console.error('Failed to save report:', err));
+    }
+  }, [isUploadedAnalysis, analysis, reportBreakdown, criticalAlerts, uploadedFile, report.title]);
 
   return (
     <div className="flex flex-col min-h-screen bg-paper">
@@ -62,28 +80,9 @@ export default function ReportResultsScreen({
         <h1 className="text-lg font-semibold text-ink font-heading flex-1 truncate">{report.title}</h1>
       </header>
 
-      <main className="flex-1 overflow-y-auto pb-[100px]">
-        {!analysisError && criticalAlerts.length > 0 && (
-          <section className="px-5 pt-4 xl:px-6">
-            <div className="rounded-[14px] border border-clarity-amber/30 bg-clarity-amber/10 p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <AlertIcon size={20} className="text-clarity-amber flex-shrink-0" />
-                <h2 className="font-bold text-clarity-amber font-heading">Critical Hits / Health Alerts</h2>
-              </div>
-              <ul className="space-y-1.5 text-sm leading-relaxed text-ink">
-                {criticalAlerts.map((alert, index) => (
-                  <li key={`${alert}-${index}`} className="flex gap-2">
-                    <span className="text-clarity-amber">•</span>
-                    <span>{alert}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </section>
-        )}
-
+      <main className="flex-1 overflow-x-hidden pb-[100px]">
         {/* Two-pane layout for tablet landscape / desktop */}
-        <div className="xl:flex xl:gap-6 xl:px-6 pt-4">
+        <div className="xl:flex xl:gap-6 xl:px-6 pt-4 w-full max-w-7xl mx-auto">
 
           {/* LEFT — document thumbnail (pinned on desktop) */}
           <div className="px-5 xl:px-0 xl:w-[380px] xl:flex-shrink-0 xl:sticky xl:top-[72px] xl:self-start xl:pt-2">
@@ -94,11 +93,13 @@ export default function ReportResultsScreen({
               aria-label="Expand document view"
             >
               <div className="rounded-[12px] overflow-hidden border border-[var(--ink-a10)]">
-                {uploadedFile ? (
-                  <img src={uploadedFile.previewUrl} alt={uploadedFile.name} className="w-full max-h-[560px] object-contain bg-white" />
-                ) : (
-                  <MockDocument docType={report.docType} />
-                )}
+                <div className="rounded-[12px] overflow-hidden border border-[var(--ink-a10)]">
+                  {uploadedFile ? (
+                    <img src={uploadedFile.previewUrl} alt={uploadedFile.name} className="w-full max-h-[420px] object-contain bg-white" />
+                  ) : (
+                    <MockDocument docType={report.docType} />
+                  )}
+                </div>
               </div>
               <div className="absolute bottom-3 right-3 bg-ink/60 backdrop-blur-sm text-white text-xs px-2.5 py-1 rounded-full">
                 Tap to expand
@@ -107,7 +108,7 @@ export default function ReportResultsScreen({
           </div>
 
           {/* RIGHT — overview, critical hits, actions */}
-          <div className="flex-1 px-5 xl:px-0 mt-5 xl:mt-0 space-y-4">
+          <div className="flex-1 px-5 xl:px-0 mt-5 xl:mt-0 space-y-6">
 
             {/* Overview card */}
             <Card className="p-5">
@@ -143,11 +144,29 @@ export default function ReportResultsScreen({
               )}
             </Card>
 
+            {/* Critical Hits moved here (Bottom of right panel) */}
+            {!analysisError && criticalAlerts.length > 0 && (
+              <div className="rounded-xl border border-clarity-amber/30 bg-clarity-amber/10 p-5">
+                <div className="flex items-center gap-2 mb-3">
+                  <AlertIcon size={20} className="text-clarity-amber flex-shrink-0" />
+                  <h2 className="font-bold text-clarity-amber font-heading">Critical Hits / Health Alerts</h2>
+                </div>
+                <ul className="space-y-2 text-sm leading-relaxed text-ink">
+                  {criticalAlerts.map((alert, index) => (
+                    <li key={`${alert}-${index}`} className="flex gap-2">
+                      <span className="text-clarity-amber">•</span>
+                      <span>{alert}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
           </div>
         </div>
       </main>
 
-      {/* Single floating Ask AI pill — ~56px tall, generous padding, one clear entry point */}
+      {/* Floating Ask AI button */}
       <button
         onClick={() => onOpenChat(analysis ?? report.overview)}
         className="fixed bottom-[84px] right-5 bg-periwinkle text-white px-6 rounded-full font-medium flex items-center gap-2.5 hover:opacity-90 transition-opacity active:scale-95 shadow-[0_6px_24px_rgba(76,99,210,0.40)] z-30"
