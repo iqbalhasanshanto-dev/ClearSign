@@ -1,12 +1,12 @@
 import { useState } from 'react'
 import { BackButton, HighlightTitle, Card, Waveform, MockDocument } from '../components/shared'
-import { SpeakerIcon, PauseIcon, RobotIcon, AlertIcon, CheckIcon } from '../icons'
-import type { Report, Screen } from '../data'
+import { SpeakerIcon, PauseIcon, RobotIcon, AlertIcon } from '../icons'
+import type { Report } from '../data'
 import type { UploadedFile } from './TakeUploadScreen'
 
 interface ReportResultsScreenProps {
   report: Report
-  onNavigate: (s: Screen) => void
+  onOpenChat: (reportContext: string) => void
   onBack: () => void
   isReadingAloud: boolean
   onToggleReadAloud: () => void
@@ -15,9 +15,30 @@ interface ReportResultsScreenProps {
   analysisError: string | null
 }
 
+function splitAnalysisSections(analysis: string) {
+  const criticalSection = analysis.match(
+    /(?:^|\n)\s*CRITICAL HITS\s*\/\s*HEALTH ALERTS\s*\n([\s\S]*?)(?=\n\s*REPORT BREAKDOWN\s*(?:\n|$)|$)/i,
+  )
+
+  if (!criticalSection) {
+    return { alerts: [], breakdown: analysis }
+  }
+
+  const alerts = criticalSection[1]
+    .split('\n')
+    .map(line => line.replace(/^\s*[•-]\s*/, '').trim())
+    .filter(Boolean)
+  const breakdown = analysis
+    .replace(criticalSection[0], '')
+    .replace(/^\s*REPORT BREAKDOWN\s*/im, '')
+    .trim()
+
+  return { alerts, breakdown }
+}
+
 export default function ReportResultsScreen({
   report,
-  onNavigate,
+  onOpenChat,
   onBack,
   isReadingAloud,
   onToggleReadAloud,
@@ -26,8 +47,12 @@ export default function ReportResultsScreen({
   analysisError,
 }: ReportResultsScreenProps) {
   const [imageExpanded, setImageExpanded] = useState(false)
-  const hasNoCritical = report.criticalHits.length === 0
   const isUploadedAnalysis = analysis !== null || analysisError !== null
+  const parsedAnalysis = analysis ? splitAnalysisSections(analysis) : null
+  const criticalAlerts = isUploadedAnalysis
+    ? parsedAnalysis?.alerts ?? []
+    : report.criticalHits.map(hit => `${hit.value} ${hit.unit} — ${hit.meaning}`)
+  const reportBreakdown = parsedAnalysis?.breakdown ?? report.overview
 
   return (
     <div className="flex flex-col min-h-screen bg-paper">
@@ -38,8 +63,27 @@ export default function ReportResultsScreen({
       </header>
 
       <main className="flex-1 overflow-y-auto pb-[100px]">
+        {!analysisError && criticalAlerts.length > 0 && (
+          <section className="px-5 pt-4 xl:px-6">
+            <div className="rounded-[14px] border border-clarity-amber/30 bg-clarity-amber/10 p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <AlertIcon size={20} className="text-clarity-amber flex-shrink-0" />
+                <h2 className="font-bold text-clarity-amber font-heading">Critical Hits / Health Alerts</h2>
+              </div>
+              <ul className="space-y-1.5 text-sm leading-relaxed text-ink">
+                {criticalAlerts.map((alert, index) => (
+                  <li key={`${alert}-${index}`} className="flex gap-2">
+                    <span className="text-clarity-amber">•</span>
+                    <span>{alert}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </section>
+        )}
+
         {/* Two-pane layout for tablet landscape / desktop */}
-        <div className="xl:flex xl:gap-6 xl:px-6">
+        <div className="xl:flex xl:gap-6 xl:px-6 pt-4">
 
           {/* LEFT — document thumbnail (pinned on desktop) */}
           <div className="px-5 xl:px-0 xl:w-[380px] xl:flex-shrink-0 xl:sticky xl:top-[72px] xl:self-start xl:pt-2">
@@ -95,60 +139,9 @@ export default function ReportResultsScreen({
                   <p className="mt-1">{analysisError}</p>
                 </div>
               ) : (
-                <div className="whitespace-pre-wrap leading-relaxed text-gray-800">{analysis ?? report.overview}</div>
+                <div className="whitespace-pre-wrap leading-relaxed text-gray-800">{reportBreakdown}</div>
               )}
             </Card>
-
-            {/* Critical Hits card */}
-            {!isUploadedAnalysis && <Card className="p-5">
-              <div className="flex items-center gap-2 mb-4">
-                {hasNoCritical ? (
-                  <CheckIcon size={20} className="text-steady-green flex-shrink-0" />
-                ) : (
-                  <AlertIcon size={20} className="text-clarity-amber flex-shrink-0" />
-                )}
-                <h2 className={`text-xl font-bold font-heading ${hasNoCritical ? 'text-ink' : 'text-clarity-amber'}`}>
-                  <HighlightTitle>{hasNoCritical ? 'Looking good' : 'Critical hits'}</HighlightTitle>
-                </h2>
-              </div>
-
-              {hasNoCritical ? (
-                <div className="bg-steady-green/8 rounded-[10px] p-4">
-                  <p className="text-base font-medium text-steady-green">
-                    Nothing here needs urgent attention.
-                  </p>
-                  <p className="text-sm mt-1" style={{ color: 'var(--ink-a50)' }}>
-                    All values in this report are within normal ranges.
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {report.criticalHits.map((hit, i) => (
-                    <div
-                      key={i}
-                      className={`rounded-[10px] p-4 border-l-4 ${hit.isCritical ? 'bg-clarity-amber/8 border-clarity-amber' : 'bg-ink/4 border-[var(--ink-a20)]'}`}
-                    >
-                      <div className="flex items-baseline gap-2 mb-1.5">
-                        <span className="text-xl font-bold text-ink font-data">
-                          {hit.value}
-                        </span>
-                        <span className="text-sm font-medium font-data" style={{ color: 'var(--ink-a50)' }}>
-                          {hit.unit}
-                        </span>
-                        {hit.isCritical && (
-                          <span className="ml-auto text-xs font-semibold text-clarity-amber bg-clarity-amber/10 px-2 py-0.5 rounded-full">
-                            Flagged
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-sm leading-relaxed" style={{ color: 'var(--ink-a50)' }}>
-                        {hit.meaning}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </Card>}
 
           </div>
         </div>
@@ -156,7 +149,7 @@ export default function ReportResultsScreen({
 
       {/* Single floating Ask AI pill — ~56px tall, generous padding, one clear entry point */}
       <button
-        onClick={() => onNavigate('chat')}
+        onClick={() => onOpenChat(analysis ?? report.overview)}
         className="fixed bottom-[84px] right-5 bg-periwinkle text-white px-6 rounded-full font-medium flex items-center gap-2.5 hover:opacity-90 transition-opacity active:scale-95 shadow-[0_6px_24px_rgba(76,99,210,0.40)] z-30"
         style={{ height: '56px' }}
         aria-label="Ask AI about this report"

@@ -4,7 +4,7 @@ const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
 const ai = new GoogleGenAI({ apiKey: apiKey || '' });
 
 const reportSystemInstruction =
-  "You are ClearSign AI, a compassionate medical report decoder. Simplify medical jargon into plain language. If the document or request is in Bangla (বাংলা), respond in fluent Bangla.";
+  "You are ClearSign AI, a compassionate medical report decoder. Simplify medical jargon into plain language. 1. LANGUAGE RULE: ALWAYS match the exact language of the user's latest prompt. If the user asks in English, reply strictly in English. If the user asks in Bangla (বাংলা), reply in Bangla. 2. FORMATTING RULE: Do NOT output raw markdown asterisks (e.g., '**', '*') or hashes ('###'). Write plain, readable text with clean line breaks and bullet points (•) so no unparsed syntax characters appear on screen.";
 
 export async function analyzeReportImage(
   base64Data: string,
@@ -24,7 +24,7 @@ export async function analyzeReportImage(
           { inlineData: { mimeType, data: base64Data } },
           {
             text: customPrompt ??
-              'Explain this medical report in plain language. Use short headings and bullet points, highlight any values or findings to discuss with a clinician, and do not diagnose.',
+              'Start with the exact plain-text heading CRITICAL HITS / HEALTH ALERTS. Under it, list key health flags, abnormal values, and primary diagnoses as bullet points using •. If none are present, write • No urgent health alerts identified. Then add a blank line and the plain-text heading REPORT BREAKDOWN followed by a clear explanation. Do not diagnose.',
           },
         ],
       }],
@@ -50,20 +50,21 @@ export async function analyzeReportImage(
   }
 }
 
-export async function askGemini(prompt: string): Promise<string> {
+export async function askGemini(prompt: string, reportContext?: string): Promise<string> {
   try {
     if (!apiKey) {
       return "⚠️ API Key missing! Please check VITE_GEMINI_API_KEY in .env.local";
     }
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash',
-      contents: prompt,
+      contents: reportContext
+        ? "Context from user's uploaded prescription/report:\n" + reportContext + "\n\nRespond to the user's specific query below in the query's language using the document context, without switching languages unless requested.\n\nUser question: " + prompt
+        : prompt,
       config: {
         systemInstruction: 
           "You are ClearSign AI, a medical assistant.\n" +
-          "1. Respond clearly with bullet points and line breaks.\n" +
-          "2. If requested or asked in Bangla (বাংলা), respond in fluent Bangla.\n" +
-          "3. Keep formatting clean and easy to read."
+          "1. LANGUAGE RULE: ALWAYS match the exact language of the user's latest prompt. If the user asks in English, reply strictly in English. If the user asks in Bangla (বাংলা), reply in Bangla.\n" +
+          "2. FORMATTING RULE: Do NOT output raw markdown asterisks (e.g., '**', '*') or hashes ('###'). Write plain, readable text with clean line breaks and bullet points (•) so no unparsed syntax characters appear on screen."
       }
     });
     return response.text || "No response received from Gemini.";

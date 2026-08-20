@@ -40,6 +40,7 @@ export default function App() {
   const [uploadedFile, setUploadedFile] = useState<UploadedFile | null>(null)
   const [uploadedAnalysis, setUploadedAnalysis] = useState<string | null>(null)
   const [analysisError, setAnalysisError] = useState<string | null>(null)
+  const [chatReportContext, setChatReportContext] = useState<string | null>(null)
   const [uploadMode, setUploadMode] = useState<UploadMode>('report')
 
   // Read aloud
@@ -75,6 +76,7 @@ export default function App() {
     setSelectedReportId(id)
     setUploadedAnalysis(null)
     setAnalysisError(null)
+    setChatReportContext(null)
     navigate('results')
   }
 
@@ -87,6 +89,7 @@ export default function App() {
     setUploadedFile(null)
     setUploadedAnalysis(null)
     setAnalysisError(null)
+    setChatReportContext(null)
     navigate('upload')
   }
 
@@ -106,6 +109,11 @@ export default function App() {
     setReports(prev => [analyzedReport, ...prev])
     setSelectedReportId(analyzedReport.id)
     navigate('results')
+  }
+
+  function handleOpenChat(reportContext: string) {
+    setChatReportContext(reportContext)
+    navigate('chat')
   }
 
   function handleLogout() {
@@ -168,7 +176,7 @@ export default function App() {
             {screen === 'results' && selectedReport && (
               <ReportResultsScreen
                 report={selectedReport}
-                onNavigate={navigate}
+                onOpenChat={handleOpenChat}
                 onBack={() => navigate('home')}
                 isReadingAloud={isReadingAloud}
                 onToggleReadAloud={() => setIsReadingAloud(v => !v)}
@@ -182,6 +190,7 @@ export default function App() {
               <QAChatScreen
                 report={selectedReport}
                 onBack={() => navigate('results')}
+                reportContext={chatReportContext}
               />
             )}
 

@@ -8,6 +8,7 @@ import { askGemini } from '../services/gemini';
 interface QAChatScreenProps {
   report: Report
   onBack: () => void
+  reportContext?: string | null
 }
 
 let msgIdCounter = 1000
@@ -15,6 +16,7 @@ let msgIdCounter = 1000
 export default function QAChatScreen({
   report,
   onBack,
+  reportContext,
 }: QAChatScreenProps) {
   const [input, setInput] = useState('')
   const [isTyping, setIsTyping] = useState(false)
@@ -38,7 +40,7 @@ export default function QAChatScreen({
     setIsTyping(true)
 
     try {
-      const responseText = await askGemini(userText)
+      const responseText = await askGemini(userText, reportContext ?? undefined)
       const aiMsg: Message = { id: String(++msgIdCounter), role: 'ai', text: responseText }
       setLocalMessages(prev => [...prev, aiMsg])
     } catch (error) {
@@ -68,6 +70,12 @@ export default function QAChatScreen({
           </div>
         </div>
       </header>
+
+      {reportContext && (
+        <div className="mx-5 mt-3 rounded-[10px] border border-periwinkle/20 bg-periwinkle/10 px-3 py-2 text-xs text-ink">
+          <span className="font-semibold text-periwinkle">Active Document:</span> {report.title}
+        </div>
+      )}
 
       {/* Suggested chips */}
       {localMessages.length === 0 && (
